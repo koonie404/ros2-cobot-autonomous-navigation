@@ -1,0 +1,325 @@
+<?xml version="1.0"?>
+<robot name="co_bot_2" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!--
+    co_bot_2 URDF/Xacro draft
+
+    Source CAD:
+      C:/Users/DMUD/Desktop/co_bot_2.STEP
+
+    Semantic part mapping from user:
+      b1, b2, part20 x2, part11, part10, part24 x2, part12 boss-extrude1, part19 -> base/body
+      part9 -> camera
+      part12 boss-extrude3 -> lidar
+      part2 x2 -> left/right wheel
+      b3 -> vertical slide
+      part17 x2 -> left/right gripper
+      part22 x2 -> left/right gripper hand
+
+    Mesh note:
+      URDF/RViz/Gazebo normally use STL/DAE/OBJ meshes, not STEP directly.
+      Export each CAD body to the mesh filenames referenced below, or change
+      the mesh filename attributes after export.
+  -->
+
+  <!-- ========================= -->
+  <!-- Tunable dimensions/limits -->
+  <!-- ========================= -->
+
+  <xacro:property name="mesh_scale" value="0.001 0.001 0.001"/>
+  <xacro:property name="mesh_rpy" value="1.5708 0 4.71239"/>
+
+  <material name="body_gray">
+    <color rgba="0.45 0.45 0.45 1.0"/>
+  </material>
+
+  <material name="sensor_blue">
+    <color rgba="0.1 0.35 0.9 1.0"/>
+  </material>
+
+  <material name="wheel_black">
+    <color rgba="0.02 0.02 0.02 1.0"/>
+  </material>
+
+  <material name="slide_green">
+    <color rgba="0.1 0.65 0.25 1.0"/>
+  </material>
+
+  <material name="gripper_orange">
+    <color rgba="0.95 0.45 0.05 1.0"/>
+  </material>
+  <!-- SolidWorks STEP is millimeter based. URDF uses meter, so 0.001 scale converts mm -> m. -->
+
+  <xacro:property name="wheel_radius" value="0.033"/>
+  <xacro:property name="wheel_width"  value="0.020"/>
+
+  <xacro:property name="base_mass"          value="3.0"/>
+  <xacro:property name="wheel_mass"         value="0.12"/>
+  <xacro:property name="slide_mass"         value="0.5"/>
+  <xacro:property name="gripper_mass"       value="0.15"/>
+  <xacro:property name="hand_mass"          value="0.08"/>
+  <xacro:property name="sensor_mass"        value="0.05"/>
+
+  <!-- Change these numbers to tune prismatic travel range. Units are meters. -->
+  <xacro:property name="slide_lower" value="0.000"/>
+  <xacro:property name="slide_upper" value="0.053"/>
+
+  <xacro:property name="left_gripper_lower"  value="0.000"/>
+  <xacro:property name="left_gripper_upper"  value="0.015"/>
+  <xacro:property name="right_gripper_lower" value="0.000"/>
+  <xacro:property name="right_gripper_upper" value="0.015"/>
+
+  <!--
+    These origins are estimated from STL bounding-box centers.
+    The STL files were exported in assembly coordinates, so each moving link
+    uses its bbox center as the link/joint frame and a negative visual origin.
+  -->
+  <xacro:property name="base_visual_xyz" value="0.14888 0.11714 -0.00041"/>
+  <xacro:property name="left_wheel_xyz" value="-0.06407 0.09245 0.03314"/>
+  <xacro:property name="right_wheel_xyz" value="-0.06461 -0.09343 0.03299"/>
+  <xacro:property name="camera_xyz" value="0.00762 -0.00047 0.18399"/>
+  <xacro:property name="lidar_xyz" value="-0.06436 -0.00047 0.21331"/>
+  <xacro:property name="slide_xyz" value="0.04300 -0.00047 0.07579"/>
+  <xacro:property name="left_gripper_xyz" value="0.03945 0.01305 0.00321"/>
+  <xacro:property name="right_gripper_xyz" value="0.03877 -0.01381 0.00747"/>
+  <xacro:property name="left_hand_xyz" value="0.03290 0.01742 0.00150"/>
+  <xacro:property name="right_hand_xyz" value="0.03291 -0.01699 -0.00150"/>
+
+    <xacro:property name="camera_visual_xyz" value="0.14126 0.11761 -0.18440"/>
+
+    <xacro:property name="lidar_visual_xyz" value="0.21324 0.11761 -0.21372"/>
+
+    <xacro:property name="left_wheel_visual_xyz" value="0.21295 0.02469 -0.03355"/>
+
+    <xacro:property name="right_wheel_visual_xyz" value="0.21349 0.21057 -0.03340"/>
+
+    <xacro:property name="slide_visual_xyz" value="0.10588 0.11761 -0.07620"/>
+
+    <xacro:property name="left_gripper_visual_xyz" value="0.06643 0.10456 -0.07941"/>
+
+    <xacro:property name="right_gripper_visual_xyz" value="0.06711 0.13142 -0.08367"/>
+
+    <xacro:property name="left_hand_visual_xyz" value="0.03353 0.08714 -0.08091"/>
+
+    <xacro:property name="right_hand_visual_xyz" value="0.03420 0.14841 -0.08217"/>
+
+  <!-- ========================= -->
+  <!-- Small reusable macros     -->
+  <!-- ========================= -->
+
+  <xacro:macro name="simple_inertial" params="mass ixx iyy izz">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${mass}"/>
+      <inertia ixx="${ixx}" ixy="0" ixz="0" iyy="${iyy}" iyz="0" izz="${izz}"/>
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="mesh_visual_collision" params="mesh material rgba">
+    <visual>
+      <origin xyz="0 0 0" rpy="${mesh_rpy}"/>
+      <geometry>
+        <mesh filename="${mesh}" scale="${mesh_scale}"/>
+      </geometry>
+      <material name="${material}">
+        <color rgba="${rgba}"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="${mesh_rpy}"/>
+      <geometry>
+        <mesh filename="${mesh}" scale="${mesh_scale}"/>
+      </geometry>
+    </collision>
+  </xacro:macro>
+
+  <xacro:macro name="mesh_visual_collision_at" params="mesh xyz material rgba">
+    <visual>
+      <origin xyz="${xyz}" rpy="${mesh_rpy}"/>
+      <geometry>
+        <mesh filename="${mesh}" scale="${mesh_scale}"/>
+      </geometry>
+      <material name="${material}">
+        <color rgba="${rgba}"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="${xyz}" rpy="${mesh_rpy}"/>
+      <geometry>
+        <mesh filename="${mesh}" scale="${mesh_scale}"/>
+      </geometry>
+    </collision>
+  </xacro:macro>
+
+  <link name="base_footprint"/>
+
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ========================= -->
+  <!-- Base/body fixed group     -->
+  <!-- ========================= -->
+
+  <link name="base_link">
+    <xacro:simple_inertial mass="${base_mass}" ixx="0.03" iyy="0.03" izz="0.05"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/body_b1.stl" xyz="${base_visual_xyz}" material="body_b1_gray" rgba="0.45 0.45 0.45 1.0"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/body_b2.stl" xyz="${base_visual_xyz}" material="body_b2_gray" rgba="0.50 0.50 0.50 1.0"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/body_part11.stl" xyz="${base_visual_xyz}" material="body_part11_gray" rgba="0.38 0.38 0.38 1.0"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/body_part10.stl" xyz="${base_visual_xyz}" material="body_part10_gray" rgba="0.60 0.60 0.60 1.0"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/body_part12_boss1.stl" xyz="${base_visual_xyz}" material="body_part12_gray" rgba="0.40 0.40 0.40 1.0"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/body_part20_1.stl" xyz="${base_visual_xyz}" material="body_part20_1_gray" rgba="0.32 0.32 0.32 1.0"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/body_part20_2.stl" xyz="${base_visual_xyz}" material="body_part20_2_gray" rgba="0.32 0.32 0.32 1.0"/>
+  </link>
+
+  <!-- ========================= -->
+  <!-- Sensors                   -->
+  <!-- ========================= -->
+
+  <link name="camera_link">
+    <xacro:simple_inertial mass="${sensor_mass}" ixx="0.0001" iyy="0.0001" izz="0.0001"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/camera_part9.stl" xyz="${camera_visual_xyz}" material="camera_blue" rgba="0.0 0.25 1.0 1.0"/>
+  </link>
+
+  <joint name="base_to_camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <origin xyz="${camera_xyz}" rpy="0 0 0"/>
+  </joint>
+
+
+  <link name="camera_link_optical"/>
+
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_link_optical"/>
+    <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708"/>
+  </joint>
+
+    <link name="lidar_link">
+    <xacro:simple_inertial mass="${sensor_mass}" ixx="0.0001" iyy="0.0001" izz="0.0001"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/lidar_part12_boss3.stl" xyz="${lidar_visual_xyz}" material="lidar_cyan" rgba="0.0 0.75 1.0 1.0"/>
+  </link>
+
+  <joint name="base_to_lidar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <origin xyz="${lidar_xyz}" rpy="0 0 0"/>
+  </joint>
+
+
+  <link name="laser_frame"/>
+
+  <joint name="lidar_to_laser_joint" type="fixed">
+    <parent link="lidar_link"/>
+    <child link="laser_frame"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ========================= -->
+  <!-- Differential wheels       -->
+  <!-- ========================= -->
+
+  <link name="left_wheel_link">
+    <xacro:simple_inertial mass="${wheel_mass}" ixx="0.0002" iyy="0.0002" izz="0.0002"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/left_wheel_part2.stl" xyz="${left_wheel_visual_xyz}" material="left_wheel_black" rgba="0.01 0.01 0.01 1.0"/>
+  </link>
+
+  <joint name="left_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="left_wheel_link"/>
+    <origin xyz="${left_wheel_xyz}" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <link name="right_wheel_link">
+    <xacro:simple_inertial mass="${wheel_mass}" ixx="0.0002" iyy="0.0002" izz="0.0002"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/right_wheel_part2.stl" xyz="${right_wheel_visual_xyz}" material="right_wheel_black" rgba="0.01 0.01 0.01 1.0"/>
+  </link>
+
+  <joint name="right_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="right_wheel_link"/>
+    <origin xyz="${right_wheel_xyz}" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <!-- ========================= -->
+  <!-- Vertical slide            -->
+  <!-- ========================= -->
+
+  <link name="slide_link">
+    <xacro:simple_inertial mass="${slide_mass}" ixx="0.002" iyy="0.002" izz="0.002"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/slide_b3.stl" xyz="${slide_visual_xyz}" material="slide_green" rgba="0.0 0.75 0.15 1.0"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/body_part19.stl" xyz="${slide_visual_xyz}" material="body_part19_gray" rgba="0.55 0.55 0.55 1.0"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/body_part24_1.stl" xyz="${slide_visual_xyz}" material="body_part24_1_gray" rgba="0.62 0.62 0.62 1.0"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/body_part24_2.stl" xyz="${slide_visual_xyz}" material="body_part24_2_gray" rgba="0.62 0.62 0.62 1.0"/>
+  </link>
+
+  <joint name="base_to_slide_joint" type="prismatic">
+    <parent link="base_link"/>
+    <child link="slide_link"/>
+    <origin xyz="${slide_xyz}" rpy="0 0 0"/>
+    <axis xyz="0 0 -1"/>
+    <limit lower="${slide_lower}" upper="${slide_upper}" effort="50" velocity="0.05"/>
+  </joint>
+
+  <!-- ========================= -->
+  <!-- X-axis gripper slides     -->
+  <!-- ========================= -->
+
+  <link name="left_gripper_link">
+    <xacro:simple_inertial mass="${gripper_mass}" ixx="0.0005" iyy="0.0005" izz="0.0005"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/left_gripper_part17.stl" xyz="${left_gripper_visual_xyz}" material="left_gripper_orange" rgba="1.0 0.35 0.0 1.0"/>
+  </link>
+
+  <joint name="slide_to_left_gripper_joint" type="prismatic">
+    <parent link="slide_link"/>
+    <child link="left_gripper_link"/>
+    <origin xyz="${left_gripper_xyz}" rpy="0 0 0"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="${left_gripper_lower}" upper="${left_gripper_upper}" effort="20" velocity="0.03"/>
+  </joint>
+
+  <link name="right_gripper_link">
+    <xacro:simple_inertial mass="${gripper_mass}" ixx="0.0005" iyy="0.0005" izz="0.0005"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/right_gripper_part17.stl" xyz="${right_gripper_visual_xyz}" material="right_gripper_orange" rgba="1.0 0.35 0.0 1.0"/>
+  </link>
+
+  <joint name="slide_to_right_gripper_joint" type="prismatic">
+    <parent link="slide_link"/>
+    <child link="right_gripper_link"/>
+    <origin xyz="${right_gripper_xyz}" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="${right_gripper_lower}" upper="${right_gripper_upper}" effort="20" velocity="0.03"/>
+  </joint>
+
+  <!-- ========================= -->
+  <!-- Hands fixed to grippers   -->
+  <!-- ========================= -->
+
+  <link name="left_hand_link">
+    <xacro:simple_inertial mass="${hand_mass}" ixx="0.0002" iyy="0.0002" izz="0.0002"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/left_hand_part22.stl" xyz="${left_hand_visual_xyz}" material="left_hand_yellow" rgba="1.0 0.85 0.0 1.0"/>
+  </link>
+
+  <joint name="left_gripper_to_left_hand_joint" type="fixed">
+    <parent link="left_gripper_link"/>
+    <child link="left_hand_link"/>
+    <origin xyz="${left_hand_xyz}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="right_hand_link">
+    <xacro:simple_inertial mass="${hand_mass}" ixx="0.0002" iyy="0.0002" izz="0.0002"/>
+    <xacro:mesh_visual_collision_at mesh="package://co_bot_2_description/meshes/right_hand_part22.stl" xyz="${right_hand_visual_xyz}" material="right_hand_yellow" rgba="1.0 0.85 0.0 1.0"/>
+  </link>
+
+  <joint name="right_gripper_to_right_hand_joint" type="fixed">
+    <parent link="right_gripper_link"/>
+    <child link="right_hand_link"/>
+    <origin xyz="${right_hand_xyz}" rpy="0 0 0"/>
+  </joint>
+
+</robot>
